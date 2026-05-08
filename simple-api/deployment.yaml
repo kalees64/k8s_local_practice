@@ -1,0 +1,95 @@
+# ─── Deployment ───────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-api
+  namespace: default
+  labels:
+    app: simple-api
+    version: "1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: simple-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0 # Zero downtime deployments
+  template:
+    metadata:
+      labels:
+        app: simple-api
+        version: "1.0"
+    spec:
+      # Security: drop all capabilities, run as non-root
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: simple-api
+          image: kalees64/simple-express-api:1.0
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          # Resource limits — prevent noisy-neighbour issues
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+          # Liveness — restart pod if unhealthy
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+
+          # Readiness — only send traffic when ready
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # Security context for container
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+      restartPolicy: Always
+
+---
+# ─── Service — exposes the deployment inside the cluster ──────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: simple-api-svc
+  namespace: default
+  labels:
+    app: simple-api
+spec:
+  selector:
+    app: simple-api
+  type: ClusterIP # Change to LoadBalancer for cloud, or NodePort for local
+  ports:
+    - name: http
+      port: 80 # Service port (external-facing)
+      targetPort: 3000 # Container port
+      protocol: TCP

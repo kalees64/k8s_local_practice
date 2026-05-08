@@ -1,0 +1,19 @@
+# Dependencies (reinstalled inside image)
+node_modules
+
+
+# Git
+.git
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor configs
+.vscode
+.idea
