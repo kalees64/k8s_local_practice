@@ -1,0 +1,102 @@
+# ─────────────────────────────────────────────────────────────
+# React Deployment
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: react-app
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: react-app
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  template:
+    metadata:
+      labels:
+        app: react-app
+
+    spec:
+      containers:
+        - name: react-app
+
+          image: kalees64/simple-react-app:1.0
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 80
+
+---
+# ─────────────────────────────────────────────────────────────
+# React Service
+# ─────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: react-app-service
+
+spec:
+  selector:
+    app: react-app
+
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+
+  type: ClusterIP
+
+---
+# ─────────────────────────────────────────────────────────────
+# Traefik Ingress
+# ─────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+#  Only enable after certificate generated and the enable this and apply again
+  # annotations:
+  #   cert-manager.io/cluster-issuer: letsencrypt-prod
+
+spec:
+  ingressClassName: traefik
+
+#  Only enable after certificate generated and the enable this and apply again
+  # tls:
+  #   - hosts:
+  #       - k3s.myfamilycircle.in 
+
+  #     secretName: yourdomain-tls
+
+  rules:
+    - host: k3s.myfamilycircle.in 
+
+# When you need domain then add above line else only add below code and start with - like (- http:)
+    
+      http:
+        paths:
+
+          # Backend API
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: simple-api-svc
+                port:
+                  number: 80
+
+          # Frontend
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: react-app-service
+                port:
+                  number: 80
